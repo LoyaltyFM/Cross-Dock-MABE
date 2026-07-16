@@ -262,15 +262,15 @@
 /* =========================================================================
    CONFIGURACIÓN
    ========================================================================= */
-const SUPABASE_URL = "https://hxwpncflvcbcluqnllzd.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_mEkHU72z69G-5Nd2uotNBQ_AgMoBwvi";
+const SUPABASE_URL = "PON-AQUI-TU-SUPABASE-URL";
+const SUPABASE_ANON_KEY = "PON-AQUI-TU-SUPABASE-ANON-KEY";
 
 // Credenciales del Administrador. OJO: esto es solo una cortina de acceso
 // en la interfaz — el archivo es 100% código de cliente (como el resto de
 // tus apps con PIN), así que la seguridad real está en las políticas RLS
 // de Supabase, no en esta contraseña. Cámbiala antes de publicar.
 const ADMIN_USER = "admin";
-const ADMIN_PASSWORD = "Karen";
+const ADMIN_PASSWORD = "CAMBIA-ESTA-CLAVE";
 
 const RETENCION_MESES = 3; // se purgan registros con fecha más vieja que esto
 
@@ -328,14 +328,17 @@ function showMsg(elId, kind, text){
 /* --------------------------- Inicio / conexión --------------------------- */
 
 async function initDB(){
-  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   try{
+    if (!window.supabase || !window.supabase.createClient){
+      throw new Error("La librería de Supabase no cargó (revisa tu conexión o bloqueador de contenido)");
+    }
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const { error } = await supabase.from("plantas").select("id").limit(1);
     if (error) throw error;
     $("dbStatus").innerHTML = `<span class="dot on"></span>Conectado`;
     purgeOldRecords();
   }catch(e){
-    $("dbStatus").innerHTML = `<span class="dot off"></span>Sin conexión — revisa SUPABASE_URL/ANON_KEY`;
+    $("dbStatus").innerHTML = `<span class="dot off"></span>Sin conexión: ${e.message}`;
   }
 }
 
