@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Registro Cross Dock MABE · Loyalty</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  :root{
+    --graphite:#1c2226; --graphite-2:#262e33; --steel:#3d4a52;
+    --paper:#f4f4f2; --amber:#e8a13b; --amber-dark:#c8811f;
+    --ok:#3f8f5f; --err:#c0463c; --line:#d8d8d3;
+    --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--graphite);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  header{
+    background:var(--graphite); color:#fff; padding:18px 20px 16px;
+    position:relative; overflow:hidden;
+  }
+  header::after{
+    content:""; position:absolute; left:0; right:0; bottom:0; height:6px;
+    background:repeating-linear-gradient(135deg, var(--amber) 0 14px, var(--graphite) 14px 28px);
+    opacity:.9;
+  }
+  header .row{display:flex; align-items:center; justify-content:space-between;}
+  header h1{margin:0; font-size:19px; letter-spacing:.02em; font-weight:700;}
+  header p{margin:4px 0 0; font-size:12.5px; color:#c7cdd1;}
+  header .who{font-size:12px; color:#c7cdd1;}
+  .linkbtn{
+    background:none; border:1px solid #55606a; color:#dfe3e5; border-radius:6px;
+    padding:6px 10px; font-size:12px; cursor:pointer;
+  }
+
+  .status-bar{
+    display:flex; align-items:center; padding:8px 20px; background:var(--graphite-2);
+    color:#dfe3e5; font-size:12px;
+  }
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;}
+  .dot.off{background:var(--err);} .dot.on{background:var(--ok);}
+
+  main{max-width:520px; margin:0 auto; padding:18px 16px 60px;}
+  .screen{display:none;}
+  .screen.active{display:block;}
+
+  .card{background:#fff; border:1px solid var(--line); border-radius:10px; padding:18px; margin-bottom:16px;}
+  .card h2{font-size:13px; text-transform:uppercase; letter-spacing:.08em; color:var(--steel); margin:0 0 14px;}
+  .card h3{font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--steel); margin:18px 0 8px;}
+
+  label{display:block; font-size:13px; font-weight:600; margin:14px 0 6px;}
+  label:first-of-type{margin-top:0;}
+  select, input{
+    width:100%; padding:12px; font-size:16px; border:1.5px solid var(--line);
+    border-radius:8px; background:#fff; color:var(--graphite); font-family:inherit;
+  }
+  input:focus, select:focus{outline:none; border-color:var(--amber-dark);}
+
+  button.primary{
+    width:100%; margin-top:20px; padding:15px; font-size:16px; font-weight:700;
+    background:var(--amber); color:var(--graphite); border:none; border-radius:9px; cursor:pointer;
+  }
+  button.primary:active{background:var(--amber-dark);}
+  button.primary:disabled{background:#d8d0bd; color:#8a8478; cursor:not-allowed;}
+  button.secondary{
+    width:100%; margin-top:12px; padding:13px; font-size:14.5px; font-weight:700;
+    background:#fff; color:var(--graphite); border:1.5px solid var(--graphite); border-radius:9px; cursor:pointer;
+  }
+  button.text{
+    background:none; border:none; color:var(--amber-dark); font-weight:700; font-size:13px;
+    padding:8px 0; cursor:pointer;
+  }
+  button.danger-sm{
+    background:none; border:none; color:var(--err); font-size:12px; cursor:pointer; padding:4px 6px;
+  }
+
+  .msg{margin-top:12px; padding:10px 12px; border-radius:8px; font-size:13px; display:none;}
+  .msg.ok{display:block; background:#e6f3ea; color:var(--ok); border:1px solid #bfe0cb;}
+  .msg.err{display:block; background:#fbe9e7; color:var(--err); border:1px solid #f0c4bf;}
+
+  .listrow{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:9px 0; border-bottom:1px solid var(--line); font-size:13.5px;
+  }
+  .listrow:last-child{border-bottom:none;}
+  .listrow .meta{color:#8a8f92; font-size:11.5px;}
+
+  .log{list-style:none; margin:0; padding:0;}
+  .log li{display:flex; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); font-size:13px;}
+  .log li:last-child{border-bottom:none;}
+  .log .meta{color:#8a8f92; font-family:var(--mono); font-size:11.5px;}
+  .log .prov{font-weight:600;}
+  .log .tar{font-family:var(--mono); background:var(--paper); padding:2px 7px; border-radius:5px;}
+
+  .home-buttons{display:flex; flex-direction:column; gap:12px; margin-top:8px;}
+  .home-buttons button{padding:22px; font-size:16px; font-weight:700; border-radius:12px; cursor:pointer;}
+  .home-buttons .b-admin{background:var(--graphite); color:#fff; border:none;}
+  .home-buttons .b-coord{background:#fff; color:var(--graphite); border:2px solid var(--graphite);}
+
+  .inline-add{background:var(--paper); border:1px dashed var(--line); border-radius:8px; padding:12px; margin-top:14px;}
+
+  footer{text-align:center; font-size:11px; color:#a7acaf; padding:10px 0 30px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="row">
+    <div>
+      <h1>Registro Cross Dock MABE</h1>
+      <p>Loyalty Logística y Distribución</p>
+    </div>
+    <div id="headerActions"></div>
+  </div>
+</header>
+
+<div class="status-bar">
+  <span id="dbStatus"><span class="dot off"></span>Conectando a la base de datos...</span>
+</div>
+
+<main>
+
+  <!-- ============ PANTALLA INICIAL ============ -->
+  <div class="screen active" id="screenHome">
+    <div class="card">
+      <h2>Selecciona tu acceso</h2>
+      <div class="home-buttons">
+        <button class="b-admin" id="goAdminBtn">Administrador</button>
+        <button class="b-coord" id="goCoordBtn">Coordinador</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ LOGIN ADMIN ============ -->
+  <div class="screen" id="screenAdminLogin">
+    <div class="card">
+      <h2>Acceso Administrador</h2>
+      <label for="adminUser">Usuario</label>
+      <input type="text" id="adminUser" autocomplete="username">
+      <label for="adminPass">Contraseña</label>
+      <input type="password" id="adminPass" autocomplete="current-password">
+      <button class="primary" id="adminLoginBtn">Entrar</button>
+      <button class="text" id="backFromAdminLogin">← Volver</button>
+      <div class="msg" id="adminLoginMsg"></div>
+    </div>
+  </div>
+
+  <!-- ============ LOGIN COORDINADOR ============ -->
+  <div class="screen" id="screenCoordLogin">
+    <div class="card">
+      <h2>Acceso Coordinador</h2>
+      <label for="coordUser">Nombre de usuario</label>
+      <input type="text" id="coordUser" autocomplete="username">
+      <label for="coordPass">Contraseña</label>
+      <input type="password" id="coordPass" autocomplete="current-password">
+      <button class="primary" id="coordLoginBtn">Entrar</button>
+      <button class="text" id="backFromCoordLogin">← Volver</button>
+      <div class="msg" id="coordLoginMsg"></div>
+    </div>
+  </div>
+
+  <!-- ============ PANEL ADMINISTRADOR ============ -->
+  <div class="screen" id="screenAdmin">
+
+    <div class="card">
+      <h2>Coordinadores</h2>
+      <label for="newCoordName">Nombre del coordinador</label>
+      <input type="text" id="newCoordName" placeholder="Ej. Daniel Ramírez">
+      <label for="newCoordPass">Contraseña</label>
+      <input type="password" id="newCoordPass" placeholder="Contraseña de acceso">
+      <button class="secondary" id="addCoordBtn">Guardar coordinador</button>
+      <div class="msg" id="coordAdminMsg"></div>
+      <h3>Coordinadores registrados</h3>
+      <div id="coordList"><div class="listrow"><span class="meta">Cargando...</span></div></div>
+    </div>
+
+    <div class="card">
+      <h2>Plantas</h2>
+      <label for="newPlantName">Nombre de la planta</label>
+      <input type="text" id="newPlantName" placeholder="Ej. Saltillo">
+      <label for="newPlantMode">Formato de organización</label>
+      <select id="newPlantMode">
+        <option value="weekly">Semanal (GENERAL + pestaña por semana)</option>
+        <option value="monthly">Mensual (GENERAL + pestaña por mes)</option>
+      </select>
+      <button class="secondary" id="addPlantBtn">Guardar planta</button>
+      <div class="msg" id="plantAdminMsg"></div>
+      <h3>Plantas registradas</h3>
+      <div id="plantList"><div class="listrow"><span class="meta">Cargando...</span></div></div>
+    </div>
+
+    <div class="card">
+      <h2>Registros</h2>
+      <label for="adminRegPlanta">Planta</label>
+      <select id="adminRegPlanta"><option value="todas">Todas las plantas</option></select>
+      <button class="secondary" id="loadRegBtn">Cargar registros</button>
+      <div class="msg" id="regAdminMsg"></div>
+      <h3>Registros (últimos 100)</h3>
+      <div id="adminRegList"><div class="listrow"><span class="meta">Selecciona una planta y da "Cargar registros".</span></div></div>
+      <button class="secondary" id="deleteAllRegBtn" style="border-color:var(--err); color:var(--err);">Borrar TODOS los registros del filtro actual</button>
+    </div>
+
+    <div class="card">
+      <h2>Exportar a Excel</h2>
+      <label for="exportPlanta">Planta</label>
+      <select id="exportPlanta"></select>
+      <label for="exportMes">Mes</label>
+      <select id="exportMes"><option value="todos">Todos los meses disponibles</option></select>
+      <button class="primary" id="exportBtn">Descargar Excel</button>
+      <div class="msg" id="exportMsg"></div>
+    </div>
+
+  </div>
+
+  <!-- ============ PANEL COORDINADOR ============ -->
+  <div class="screen" id="screenCoord">
+
+    <div class="card">
+      <h2>Nuevo registro</h2>
+
+      <label for="fecha">Fecha</label>
+      <input type="date" id="fecha">
+
+      <label for="proveedor">Nombre de proveedor</label>
+      <input type="text" id="proveedor" placeholder="Ej. QUINRO" autocomplete="off">
+
+      <label for="tarimas">Número de tarimas</label>
+      <input type="number" id="tarimas" min="1" step="1" inputmode="numeric">
+
+      <label for="factura">Número de factura</label>
+      <input type="text" id="factura" placeholder="Ej. 26313 ó 26313-26314" autocomplete="off">
+
+      <label for="planta">Planta</label>
+      <select id="planta"></select>
+      <button class="text" id="toggleAddPlant">+ Agregar planta nueva</button>
+      <div class="inline-add" id="addPlantInline" style="display:none;">
+        <label for="quickPlantName">Nombre de la planta nueva</label>
+        <input type="text" id="quickPlantName" placeholder="Ej. Monterrey">
+        <button class="secondary" id="quickAddPlantBtn">Agregar y usar</button>
+      </div>
+
+      <button class="primary" id="submitBtn">Guardar registro</button>
+      <div class="msg" id="formMsg"></div>
+    </div>
+
+    <div class="card">
+      <h2>Registros recientes</h2>
+      <ul class="log" id="log"><li style="color:#a7acaf;">Cargando...</li></ul>
+    </div>
+
+  </div>
+
+</main>
+
+<footer>uso interno</footer>
+
+<script>
+/* =========================================================================
+   CONFIGURACIÓN
+   ========================================================================= */
+const SUPABASE_URL = "PON-AQUI-TU-SUPABASE-URL";
+const SUPABASE_ANON_KEY = "PON-AQUI-TU-SUPABASE-ANON-KEY";
+
+// Credenciales del Administrador. OJO: esto es solo una cortina de acceso
+// en la interfaz — el archivo es 100% código de cliente (como el resto de
+// tus apps con PIN), así que la seguridad real está en las políticas RLS
+// de Supabase, no en esta contraseña. Cámbiala antes de publicar.
+const ADMIN_USER = "admin";
+const ADMIN_PASSWORD = "CAMBIA-ESTA-CLAVE";
+
+const RETENCION_MESES = 3; // se purgan registros con fecha más vieja que esto
+
+const MESES_ABR   = ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
+const MESES_LARGO = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+
+/* Regla de semana-del-mes deducida del archivo real de Saltillo (Jun 2026):
+   semana 1 = primer lunes-viernes del mes, semana 2 = el siguiente, etc.,
+   y lo que sobra después de la 4ª semana se acumula en la pestaña "4 SEM".
+   Ajusta esta función si tu regla real es distinta. */
+function deduceWeekOfMonth(date){
+  const first = new Date(date.getFullYear(), date.getMonth(), 1);
+  const offset = (8 - first.getDay()) % 7;
+  const firstMonday = new Date(first);
+  firstMonday.setDate(1 + (first.getDay() === 1 ? 0 : offset));
+  if (date < firstMonday) return 1;
+  const diffDays = Math.floor((date - firstMonday) / 86400000);
+  return Math.min(4, Math.floor(diffDays / 7) + 1);
+}
+
+/* ========================================================================= */
+
+const $ = (id) => document.getElementById(id);
+let supabase;
+let currentCoord = null; // { id, nombre }
+let plantsCache = [];    // filas de la tabla "plantas"
+
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  $(id).classList.add("active");
+}
+
+function setHeaderActions(html){
+  $("headerActions").innerHTML = html;
+}
+
+async function sha256(text){
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,"0")).join("");
+}
+
+function todayISO(){
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0,10);
+}
+
+function showMsg(elId, kind, text){
+  const el = $(elId);
+  el.className = `msg ${kind}`;
+  el.textContent = text;
+  setTimeout(() => { el.className = "msg"; }, 5000);
+}
+
+/* --------------------------- Inicio / conexión --------------------------- */
+
+async function initDB(){
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  try{
+    const { error } = await supabase.from("plantas").select("id").limit(1);
+    if (error) throw error;
+    $("dbStatus").innerHTML = `<span class="dot on"></span>Conectado`;
+    purgeOldRecords();
+  }catch(e){
+    $("dbStatus").innerHTML = `<span class="dot off"></span>Sin conexión — revisa SUPABASE_URL/ANON_KEY`;
+  }
+}
+
+async function purgeOldRecords(){
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - RETENCION_MESES);
+  const cutoffStr = cutoff.toISOString().slice(0,10);
+  await supabase.from("registros").delete().lt("fecha", cutoffStr);
+}
+
+/* ------------------------------ Navegación ------------------------------- */
+
+$("goAdminBtn").addEventListener("click", () => showScreen("screenAdminLogin"));
+$("goCoordBtn").addEventListener("click", () => showScreen("screenCoordLogin"));
+$("backFromAdminLogin").addEventListener("click", () => showScreen("screenHome"));
+$("backFromCoordLogin").addEventListener("click", () => showScreen("screenHome"));
+
+function logout(){
+  currentCoord = null;
+  setHeaderActions("");
+  showScreen("screenHome");
+}
+
+/* ------------------------------ Login admin ------------------------------ */
+
+$("adminLoginBtn").addEventListener("click", async () => {
+  const u = $("adminUser").value.trim();
+  const p = $("adminPass").value;
+  if (u === ADMIN_USER && p === ADMIN_PASSWORD){
+    $("adminUser").value = ""; $("adminPass").value = "";
+    setHeaderActions(`<button class="linkbtn" id="logoutBtn">Salir</button>`);
+    $("logoutBtn").addEventListener("click", logout);
+    showScreen("screenAdmin");
+    await refreshCoordList();
+    await refreshPlantList();
+    await refreshExportPlantaSelect();
+    await refreshMonthOptions();
+    await refreshAdminRegPlantaSelect();
+  } else {
+    showMsg("adminLoginMsg", "err", "Usuario o contraseña incorrectos.");
+  }
+});
+
+/* --------------------------- Login coordinador ---------------------------- */
+
+$("coordLoginBtn").addEventListener("click", async () => {
+  const u = $("coordUser").value.trim();
+  const p = $("coordPass").value;
+  if (!u || !p){
+    showMsg("coordLoginMsg", "err", "Ingresa usuario y contraseña.");
+    return;
+  }
+  try{
+    const hash = await sha256(p);
+    const { data, error } = await supabase
+      .from("coordinadores").select("*")
+      .ilike("nombre", u).eq("password_hash", hash).limit(1);
+    if (error) throw error;
+    if (!data || !data.length){
+      showMsg("coordLoginMsg", "err", "Usuario o contraseña incorrectos.");
+      return;
+    }
+    currentCoord = data[0];
+    $("coordUser").value = ""; $("coordPass").value = "";
+    setHeaderActions(`<span class="who">${currentCoord.nombre}</span> <button class="linkbtn" id="logoutBtn">Salir</button>`);
+    $("logoutBtn").addEventListener("click", logout);
+    showScreen("screenCoord");
+    await refreshCoordPlantaSelect();
+    await refreshLog();
+  }catch(e){
+    showMsg("coordLoginMsg", "err", "Error de conexión: " + e.message);
+  }
+});
+
+/* ----------------------- Administrador: coordinadores --------------------- */
+
+$("addCoordBtn").addEventListener("click", async () => {
+  const nombre = $("newCoordName").value.trim();
+  const pass = $("newCoordPass").value;
+  if (!nombre || !pass){
+    showMsg("coordAdminMsg", "err", "Completa nombre y contraseña.");
+    return;
+  }
+  try{
+    const password_hash = await sha256(pass);
+    const { error } = await supabase.from("coordinadores").insert({ nombre, password_hash });
+    if (error) throw error;
+    showMsg("coordAdminMsg", "ok", "Coordinador guardado.");
+    $("newCoordName").value = ""; $("newCoordPass").value = "";
+    await refreshCoordList();
+  }catch(e){
+    showMsg("coordAdminMsg", "err", "No se pudo guardar: " + e.message);
+  }
+});
+
+async function refreshCoordList(){
+  const { data, error } = await supabase.from("coordinadores").select("*").order("nombre");
+  const box = $("coordList");
+  if (error || !data || !data.length){
+    box.innerHTML = `<div class="listrow"><span class="meta">Sin coordinadores registrados.</span></div>`;
+    return;
+  }
+  box.innerHTML = data.map(c => `
+    <div class="listrow">
+      <span>${c.nombre}</span>
+      <button class="danger-sm" data-id="${c.id}" data-kind="coord">Eliminar</button>
+    </div>`).join("");
+  box.querySelectorAll("button[data-kind='coord']").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await supabase.from("coordinadores").delete().eq("id", btn.dataset.id);
+      await refreshCoordList();
+    });
+  });
+}
+
+/* -------------------------- Administrador: plantas ------------------------ */
+
+$("addPlantBtn").addEventListener("click", async () => {
+  const nombre = $("newPlantName").value.trim();
+  const modo = $("newPlantMode").value;
+  if (!nombre){
+    showMsg("plantAdminMsg", "err", "Escribe el nombre de la planta.");
+    return;
+  }
+  await createPlanta(nombre, modo, "plantAdminMsg");
+  $("newPlantName").value = "";
+  await refreshPlantList();
+  await refreshExportPlantaSelect();
+});
+
+async function createPlanta(nombre, modo, msgElId){
+  const file_label = nombre.trim().toUpperCase().replace(/\s+/g, "_");
+  try{
+    const { data, error } = await supabase.from("plantas")
+      .insert({ nombre, modo, file_label }).select().single();
+    if (error) throw error;
+    if (msgElId) showMsg(msgElId, "ok", "Planta guardada.");
+    return data;
+  }catch(e){
+    if (msgElId) showMsg(msgElId, "err", "No se pudo guardar: " + e.message);
+    return null;
+  }
+}
+
+async function refreshPlantList(){
+  const { data, error } = await supabase.from("plantas").select("*").order("nombre");
+  plantsCache = data || [];
+  const box = $("plantList");
+  if (error || !data || !data.length){
+    box.innerHTML = `<div class="listrow"><span class="meta">Sin plantas registradas.</span></div>`;
+    return;
+  }
+  box.innerHTML = data.map(p => `
+    <div class="listrow">
+      <span>${p.nombre}<br><span class="meta">${p.modo === "weekly" ? "Semanal" : "Mensual"}</span></span>
+      <button class="danger-sm" data-id="${p.id}" data-kind="plant">Eliminar</button>
+    </div>`).join("");
+  box.querySelectorAll("button[data-kind='plant']").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await supabase.from("plantas").delete().eq("id", btn.dataset.id);
+      await refreshPlantList();
+      await refreshExportPlantaSelect();
+    });
+  });
+}
+
+/* ----------------------- Coordinador: registro de datos -------------------- */
+
+async function refreshCoordPlantaSelect(){
+  const { data } = await supabase.from("plantas").select("*").order("nombre");
+  plantsCache = data || [];
+  $("planta").innerHTML = plantsCache.length
+    ? plantsCache.map(p => `<option value="${p.id}">${p.nombre}</option>`).join("")
+    : `<option value="">Sin plantas — agrega una abajo</option>`;
+}
+
+$("toggleAddPlant").addEventListener("click", () => {
+  const box = $("addPlantInline");
+  box.style.display = box.style.display === "none" ? "block" : "none";
+});
+
+$("quickAddPlantBtn").addEventListener("click", async () => {
+  const nombre = $("quickPlantName").value.trim();
+  if (!nombre){
+    showMsg("formMsg", "err", "Escribe el nombre de la planta nueva.");
+    return;
+  }
+  // Las plantas agregadas desde Coordinador quedan en modo "mensual" por
+  // defecto; el Administrador puede ajustarlas luego si necesitan formato
+  // semanal como Saltillo.
+  const created = await createPlanta(nombre, "monthly", null);
+  if (created){
+    $("quickPlantName").value = "";
+    $("addPlantInline").style.display = "none";
+    await refreshCoordPlantaSelect();
+    $("planta").value = created.id;
+    showMsg("formMsg", "ok", "Planta agregada.");
+  } else {
+    showMsg("formMsg", "err", "No se pudo agregar la planta.");
+  }
+});
+
+$("submitBtn").addEventListener("click", async () => {
+  const record = {
+    fecha: $("fecha").value,
+    proveedor: $("proveedor").value.trim().toUpperCase(),
+    tarimas: parseInt($("tarimas").value, 10),
+    factura: $("factura").value.trim(),
+    planta_id: $("planta").value
+  };
+  if (!record.fecha || !record.proveedor || !record.tarimas || !record.planta_id){
+    showMsg("formMsg", "err", "Completa fecha, proveedor, tarimas y planta.");
+    return;
+  }
+  $("submitBtn").disabled = true;
+  $("submitBtn").textContent = "Guardando...";
+  try{
+    const { error } = await supabase.from("registros").insert(record);
+    if (error) throw error;
+    showMsg("formMsg", "ok", "Registro guardado.");
+    $("proveedor").value = ""; $("tarimas").value = ""; $("factura").value = "";
+    await refreshLog();
+  }catch(e){
+    showMsg("formMsg", "err", "No se pudo guardar: " + e.message);
+  }finally{
+    $("submitBtn").disabled = false;
+    $("submitBtn").textContent = "Guardar registro";
+  }
+});
+
+async function refreshLog(){
+  const { data, error } = await supabase
+    .from("registros").select("*, plantas(nombre)")
+    .order("created_at", { ascending: false }).limit(15);
+  const list = $("log");
+  if (error || !data || !data.length){
+    list.innerHTML = `<li style="color:#a7acaf;">Aún no hay registros.</li>`;
+    return;
+  }
+  list.innerHTML = data.map(r => `<li>
+      <span><span class="prov">${r.proveedor}</span><br>
+      <span class="meta">${r.plantas ? r.plantas.nombre : "—"} · ${r.fecha} · fact. ${r.factura || "—"}</span></span>
+      <span class="tar">${r.tarimas} tar.</span>
+    </li>`).join("");
+}
+
+/* --------------------------- Administrador: registros ---------------------- */
+
+async function refreshAdminRegPlantaSelect(){
+  const { data } = await supabase.from("plantas").select("*").order("nombre");
+  const opts = (data || []).map(p => `<option value="${p.id}">${p.nombre}</option>`).join("");
+  $("adminRegPlanta").innerHTML = `<option value="todas">Todas las plantas</option>` + opts;
+}
+
+async function loadAdminRegistros(){
+  const plantaId = $("adminRegPlanta").value;
+  let query = supabase.from("registros").select("*, plantas(nombre)")
+    .order("fecha", { ascending: false }).limit(100);
+  if (plantaId !== "todas") query = query.eq("planta_id", plantaId);
+  const { data, error } = await query;
+  const box = $("adminRegList");
+  if (error){
+    box.innerHTML = `<div class="listrow"><span class="meta">Error: ${error.message}</span></div>`;
+    return;
+  }
+  if (!data || !data.length){
+    box.innerHTML = `<div class="listrow"><span class="meta">Sin registros para este filtro.</span></div>`;
+    return;
+  }
+  box.innerHTML = data.map(r => `
+    <div class="listrow">
+      <span>${r.proveedor} · ${r.tarimas} tar.<br>
+      <span class="meta">${r.plantas ? r.plantas.nombre : "—"} · ${r.fecha} · fact. ${r.factura || "—"}</span></span>
+      <button class="danger-sm" data-id="${r.id}">Eliminar</button>
+    </div>`).join("");
+  box.querySelectorAll("button[data-id]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("¿Eliminar este registro? No se puede deshacer.")) return;
+      await supabase.from("registros").delete().eq("id", btn.dataset.id);
+      await loadAdminRegistros();
+    });
+  });
+}
+
+$("loadRegBtn").addEventListener("click", loadAdminRegistros);
+
+$("deleteAllRegBtn").addEventListener("click", async () => {
+  const plantaId = $("adminRegPlanta").value;
+  const scope = plantaId === "todas" ? "TODAS las plantas" : "la planta seleccionada";
+  if (!confirm(`¿Borrar TODOS los registros de ${scope}? Esta acción no se puede deshacer.`)) return;
+  if (!confirm("Confirma una vez más: se eliminarán permanentemente.")) return;
+  try{
+    let query = supabase.from("registros").delete();
+    query = plantaId === "todas" ? query.not("id", "is", null) : query.eq("planta_id", plantaId);
+    const { error } = await query;
+    if (error) throw error;
+    showMsg("regAdminMsg", "ok", "Registros eliminados.");
+    await loadAdminRegistros();
+    await refreshMonthOptions();
+  }catch(e){
+    showMsg("regAdminMsg", "err", "No se pudo borrar: " + e.message);
+  }
+});
+
+/* --------------------------- Administrador: exportar ----------------------- */
+
+async function refreshExportPlantaSelect(){
+  const { data } = await supabase.from("plantas").select("*").order("nombre");
+  plantsCache = data || [];
+  $("exportPlanta").innerHTML = plantsCache.length
+    ? plantsCache.map(p => `<option value="${p.id}">${p.nombre}</option>`).join("")
+    : `<option value="">Sin plantas registradas</option>`;
+}
+
+async function refreshMonthOptions(){
+  const { data } = await supabase.from("registros").select("fecha");
+  const sel = $("exportMes");
+  if (!data || !data.length){
+    sel.innerHTML = `<option value="todos">Todos los meses disponibles</option>`;
+    return;
+  }
+  const months = [...new Set(data.map(r => r.fecha.slice(0,7)))].sort();
+  sel.innerHTML = `<option value="todos">Todos los meses disponibles</option>` +
+    months.map(m => {
+      const [y, mo] = m.split("-");
+      return `<option value="${m}">${MESES_LARGO[parseInt(mo,10)-1]} ${y}</option>`;
+    }).join("");
+}
+
+$("exportBtn").addEventListener("click", async () => {
+  const plantCfg = plantsCache.find(p => p.id === $("exportPlanta").value);
+  const mes = $("exportMes").value; // "todos" o "YYYY-MM"
+  if (!plantCfg){
+    showMsg("exportMsg", "err", "Selecciona una planta.");
+    return;
+  }
+
+  $("exportBtn").disabled = true;
+  $("exportBtn").textContent = "Generando...";
+  try{
+    const { data, error } = await supabase
+      .from("registros").select("*")
+      .eq("planta_id", plantCfg.id)
+      .order("fecha", { ascending: true });
+    if (error) throw error;
+
+    const rows = mes === "todos" ? data : data.filter(r => r.fecha.slice(0,7) === mes);
+    if (!rows.length){
+      showMsg("exportMsg", "err", "No hay registros para exportar con ese filtro.");
+      return;
+    }
+    const wb = buildWorkbook(plantCfg, rows);
+    const suffix = mes === "todos" ? "TODOS" : mes;
+    XLSX.writeFile(wb, `${plantCfg.file_label}_${suffix}.xlsx`);
+    showMsg("exportMsg", "ok", "Excel descargado.");
+  }catch(e){
+    showMsg("exportMsg", "err", "No se pudo exportar: " + e.message);
+  }finally{
+    $("exportBtn").disabled = false;
+    $("exportBtn").textContent = "Descargar Excel";
+  }
+});
+
+const HEADER = ["FECHA","PROVEEDOR","TARIMAS","FACTURA","PLANTA"];
+
+function rowToAOA(r, plantLabel){
+  return [r.fecha, r.proveedor, r.tarimas, r.factura || "", plantLabel];
+}
+
+function sheetFromRows(rows, plantLabel, withTotal){
+  const aoa = [HEADER, ...rows.map(r => rowToAOA(r, plantLabel))];
+  if (withTotal){
+    aoa.push([]);
+    aoa.push([null, "TOTAL TARIMAS", null, null, null]);
+  }
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  if (withTotal && rows.length){
+    const firstDataRow = 2, lastDataRow = 1 + rows.length;
+    const totalRow = lastDataRow + 2;
+    const cellRef = XLSX.utils.encode_cell({ r: totalRow - 1, c: 2 });
+    ws[cellRef] = { t: "n", f: `SUM(C${firstDataRow}:C${lastDataRow})` };
+  }
+  ws["!cols"] = [{wch:12},{wch:22},{wch:10},{wch:20},{wch:14}];
+  return ws;
+}
+
+function buildWorkbook(plantCfg, rows){
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, sheetFromRows(rows, plantCfg.nombre, false), "GENERAL");
+
+  const byMonth = {};
+  rows.forEach(r => {
+    const key = r.fecha.slice(0,7);
+    (byMonth[key] = byMonth[key] || []).push(r);
+  });
+
+  Object.keys(byMonth).sort().forEach(monthKey => {
+    const [y, mo] = monthKey.split("-");
+    const monthRows = byMonth[monthKey];
+    const mesAbr = MESES_ABR[parseInt(mo,10)-1];
+    const mesLargo = MESES_LARGO[parseInt(mo,10)-1];
+
+    if (plantCfg.modo === "weekly"){
+      const byWeek = {};
+      monthRows.forEach(r => {
+        const w = deduceWeekOfMonth(new Date(r.fecha + "T00:00:00"));
+        (byWeek[w] = byWeek[w] || []).push(r);
+      });
+      Object.keys(byWeek).sort().forEach(w => {
+        const sheetName = `${mesAbr} ${w} SEM`.slice(0, 31);
+        XLSX.utils.book_append_sheet(wb, sheetFromRows(byWeek[w], plantCfg.nombre, true), sheetName);
+      });
+    } else {
+      const sheetName = `${mesLargo} ${y}`.slice(0, 31);
+      XLSX.utils.book_append_sheet(wb, sheetFromRows(monthRows, plantCfg.nombre, false), sheetName);
+    }
+  });
+
+  return wb;
+}
+
+/* ------------------------------------------------------------------------ */
+
+$("fecha").value = todayISO();
+initDB();
+</script>
+</body>
+</html>
